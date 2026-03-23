@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leafwise — Plant Disease Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --border: #E4E0D8;
+    --text: #1A1A18;
+    --text-muted: #7A7870;
+    --accent: #3A6B35;
+    --accent-light: #EAF2E8;
+    --accent-mid: #C5DCC2;
+    --danger: #B85450;
+    --warn: #C07C2A;
+    --ok: #3A6B35;
+    --mono: 'DM Mono', monospace;
+    --serif: 'DM Serif Display', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .shell {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .sidebar-sub {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .history-label {
+    padding: 14px 24px 10px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .clear-btn:hover { background: var(--border); color: var(--danger); }
+
+  .history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 12px 12px;
+  }
+
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-track { background: transparent; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+    margin-bottom: 4px;
+  }
+  .history-item:hover { background: var(--bg); }
+  .history-item.active { background: var(--accent-light); border-color: var(--accent-mid); }
+
+  .hist-thumb {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--border);
+  }
+
+  .hist-info { flex: 1; min-width: 0; }
+  .hist-plant {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hist-disease {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .severity-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sev-mild { background: var(--ok); }
+  .sev-moderate { background: var(--warn); }
+  .sev-severe { background: var(--danger); }
+
+  .empty-history {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  /* Main */
+  .main {
+    padding: 40px 48px;
+    max-width: 740px;
+  }
+
+  .main-header {
+    margin-bottom: 32px;
+  }
+
+  .main-title {
+    font-family: var(--serif);
+    font-size: 32px;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+
+  .main-title em { color: var(--accent); font-style: italic; }
+
+  .main-sub {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 8px;
+    line-height: 1.7;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .upload-icon {
+    width: 44px; height: 44px;
+    margin: 0 auto 12px;
+    background: var(--accent-light);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .upload-text { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  .upload-hint { font-size: 11px; color: var(--text-muted); }
+
+  /* Preview */
+  .preview-wrap {
+    display: none;
+    position: relative;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .preview-wrap.show { display: block; }
+  .preview-img {
+    width: 100%;
+    max-height: 280px;
+    object-fit: cover;
+    display: block;
+  }
+  .preview-clear {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .preview-clear:hover { background: var(--danger); color: white; border-color: var(--danger); }
+
+  /* Analyze button */
+  .analyze-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .analyze-btn:hover:not(:disabled) { background: #2d5429; }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result card */
+  .result-card {
+    display: none;
+    margin-top: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    animation: fadeUp 0.3s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .result-card.show { display: block; }
+
+  .result-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .result-plant {
+    font-family: var(--serif);
+    font-size: 22px;
+    letter-spacing: -0.3px;
+  }
+
+  .result-disease {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .result-badges {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .badge {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-conf-high { background: var(--accent-light); color: var(--accent); }
+  .badge-conf-medium { background: #FFF4E0; color: var(--warn); }
+  .badge-conf-low { background: #FBE8E8; color: var(--danger); }
+  .badge-sev-mild { background: var(--accent-light); color: var(--ok); }
+  .badge-sev-moderate { background: #FFF4E0; color: var(--warn); }
+  .badge-sev-severe { background: #FBE8E8; color: var(--danger); }
+
+  .result-body { padding: 20px 24px; }
+
+  .result-section { margin-bottom: 20px; }
+  .result-section:last-child { margin-bottom: 0; }
+
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .section-content {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .bullet-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .bullet-list li {
+    display: flex;
+    gap: 8px;
+    line-height: 1.6;
+  }
+  .bullet-list li::before {
+    content: '—';
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Error */
+  .error-msg {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #FBE8E8;
+    border: 1px solid #ECC8C8;
+    border-radius: 8px;
+    color: var(--danger);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .error-msg.show { display: block; }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; max-height: 220px; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar: history -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo"><span class="logo-dot"></span> Leafwise</div>
+      <div class="sidebar-sub">Plant Disease Detector</div>
+    </div>
+    <div class="history-label">
+      Scan History
+      <button class="clear-btn" onclick="clearHistory()">Clear all</button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="empty-history" id="emptyHistory">No scans yet.<br>Upload a leaf to get started.</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="main-header">
+      <h1 class="main-title">Diagnose your <em>plant.</em></h1>
+      <p class="main-sub">Upload a photo of a leaf — get an instant diagnosis,<br>treatment advice, and severity assessment.</p>
+    </div>
+
+    <!-- Upload -->
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" accept="image/*" id="fileInput" onchange="handleFile(this.files[0])">
+      <div class="upload-icon">🌿</div>
+      <div class="upload-text">Drop a leaf image here, or click to browse</div>
+      <div class="upload-hint">JPG, PNG, WEBP — natural light photos work best</div>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" class="preview-img" src="" alt="Preview">
+      <button class="preview-clear" onclick="clearImage()">✕ Remove</button>
+    </div>
+
+    <button class="analyze-btn" id="analyzeBtn" onclick="analyze()" disabled>
+      <div class="spinner" id="spinner"></div>
+      <span id="btnText">Analyze Leaf</span>
+    </button>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Result -->
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <div>
+          <div class="result-plant" id="resPlant">—</div>
+          <div class="result-disease" id="resDiagnosis">—</div>
+        </div>
+        <div class="result-badges">
+          <span class="badge" id="resConfBadge">—</span>
+          <span class="badge" id="resSevBadge">—</span>
+        </div>
+      </div>
+      <div class="result-body">
+        <div class="result-section">
+          <div class="section-label">Symptoms Observed</div>
+          <ul class="bullet-list" id="resSymptoms"></ul>
+        </div>
+        <div class="divider"></div>
+        <div class="result-section">
+          <div class="section-label">Cause</div>
+          <div class="section-content" id="resCause">—</div>
+        </div>
+        <div class="divider"></div>
+        <div class="result-section">
+          <div class="section-label">Treatment & Prevention</div>
+          <ul class="bullet-list" id="resTreatment"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  let currentFile = null;
+  let currentBase64 = null;
+  let history = JSON.parse(localStorage.getItem('leafwise_history') || '[]');
+
+  // Drag & drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    currentFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      currentBase64 = e.target.result.split(',')[1];
+      document.getElementById('previewImg').src = e.target.result;
+      document.getElementById('previewWrap').classList.add('show');
+      document.getElementById('uploadZone').style.display = 'none';
+      document.getElementById('analyzeBtn').disabled = false;
+      document.getElementById('resultCard').classList.remove('show');
+      document.getElementById('errorMsg').classList.remove('show');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    currentFile = null; currentBase64 = null;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('previewWrap').classList.remove('show');
+    document.getElementById('uploadZone').style.display = '';
+    document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('resultCard').classList.remove('show');
+    document.getElementById('errorMsg').classList.remove('show');
+  }
+
+  async function analyze() {
+    if (!currentBase64) return;
+    const btn = document.getElementById('analyzeBtn');
+    const spinner = document.getElementById('spinner');
+    const btnText = document.getElementById('btnText');
+    btn.disabled = true;
+    spinner.style.display = 'block';
+    btnText.textContent = 'Analyzing…';
+    document.getElementById('errorMsg').classList.remove('show');
+    document.getElementById('resultCard').classList.remove('show');
+
+    const prompt = `You are an expert plant pathologist specializing in disease detection from leaf images. Analyze this uploaded image of a plant leaf step-by-step.
+
+Steps:
+1. Examine the leaf closely: Note colors, spots, lesions, discoloration, texture changes, wilting, holes, or growth abnormalities. Identify the plant type if possible.
+2. Diagnose the most likely disease(s) or pest issue(s). Be specific.
+3. Explain your reasoning based on visible symptoms matching known diseases.
+4. If unclear, say so and suggest better photos.
+
+Respond ONLY with a valid JSON object and no extra text or markdown:
+{
+  "plant_type": "...",
+  "diagnosis": "...",
+  "confidence": "High|Medium|Low",
+  "symptoms": ["...", "..."],
+  "cause": "...",
+  "treatment": ["...", "..."],
+  "severity": "Mild|Moderate|Severe"
+}`;
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: currentFile.type, data: currentBase64 } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const raw = data.content.map(i => i.text || '').join('');
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(clean);
+
+      renderResult(result);
+      saveToHistory(result);
+    } catch (err) {
+      const errEl = document.getElementById('errorMsg');
+      errEl.textContent = 'Analysis failed. Please try again with a clearer image in natural light.';
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+      btnText.textContent = 'Analyze Leaf';
+    }
+  }
+
+  function renderResult(r) {
+    document.getElementById('resPlant').textContent = r.plant_type || 'Unknown Plant';
+    document.getElementById('resDiagnosis').textContent = r.diagnosis || '—';
+    document.getElementById('resCause').textContent = r.cause || '—';
+
+    // Confidence badge
+    const confBadge = document.getElementById('resConfBadge');
+    confBadge.textContent = (r.confidence || 'Low') + ' confidence';
+    confBadge.className = 'badge badge-conf-' + (r.confidence || 'low').toLowerCase();
+
+    // Severity badge
+    const sevBadge = document.getElementById('resSevBadge');
+    sevBadge.textContent = (r.severity || 'Unknown') + ' severity';
+    sevBadge.className = 'badge badge-sev-' + (r.severity || 'mild').toLowerCase();
+
+    // Symptoms
+    const symEl = document.getElementById('resSymptoms');
+    symEl.innerHTML = (r.symptoms || []).map(s => `<li>${s}</li>`).join('');
+
+    // Treatment
+    const treatEl = document.getElementById('resTreatment');
+    treatEl.innerHTML = (r.treatment || []).map(t => `<li>${t}</li>`).join('');
+
+    document.getElementById('resultCard').classList.add('show');
+  }
+
+  function saveToHistory(result) {
+    const entry = {
+      id: Date.now(),
+      thumb: document.getElementById('previewImg').src,
+      plant: result.plant_type || 'Unknown',
+      disease: result.diagnosis || '—',
+      severity: (result.severity || 'mild').toLowerCase(),
+      full: result
+    };
+    history.unshift(entry);
+    if (history.length > 30) history = history.slice(0, 30);
+    localStorage.setItem('leafwise_history', JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    const empty = document.getElementById('emptyHistory');
+    if (!history.length) { empty.style.display = ''; list.innerHTML = ''; list.appendChild(empty); return; }
+    empty.style.display = 'none';
+    list.innerHTML = history.map((h, i) => `
+      <div class="history-item" onclick="loadHistoryItem(${i})" id="hist-${h.id}">
+        <img class="hist-thumb" src="${h.thumb}" alt="">
+        <div class="hist-info">
+          <div class="hist-plant">${h.plant}</div>
+          <div class="hist-disease">${h.disease}</div>
+        </div>
+        <div class="severity-dot sev-${h.severity}"></div>
+      </div>
+    `).join('');
+  }
+
+  function loadHistoryItem(i) {
+    const h = history[i];
+    document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('hist-' + h.id)?.classList.add('active');
+    renderResult(h.full);
+    document.getElementById('previewImg').src = h.thumb;
+    document.getElementById('previewWrap').classList.add('show');
+    document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('resultCard').classList.add('show');
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function clearHistory() {
+    if (!history.length) return;
+    if (!confirm('Clear all scan history?')) return;
+    history = [];
+    localStorage.removeItem('leafwise_history');
+    renderHistory();
+  }
+
+  // Init
+  renderHistory();
+</script>
+</body>
+</html>
